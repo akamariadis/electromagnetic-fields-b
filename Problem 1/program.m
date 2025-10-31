@@ -231,3 +231,101 @@ for idxPos = 1:numel(r_over_a_list)
     ylim([0 ymax]);
     legend({'όλες οι ρίζες','ανιούσα','κατιούσα'}, 'Location','northwest');
 end
+
+% ΕΡΩΤΗΜΑ Δ
+
+clear;
+close all;
+clc;
+
+gamma = 20;
+kappa = 20;
+a     = 1;
+E0_list = [0.5, 1.0, 2.0, 3.0];    % V/m
+rmin = 0.01; rmax = 1.5; Nr = 700; % απο 0.01a έως 1.5a
+Emax = 12.0;
+Ngrid = 6000;
+fE = @(E) E .* (1 + gamma ./ (1 + kappa .* E.^2));
+ra_vals = linspace(rmin, rmax, Nr);
+for j = 1:numel(E0_list)
+    E0 = E0_list(j);
+    S_vals = E0 .* (a ./ ra_vals).^2;   % S(r) = E0*(a/r)^2
+    allRoots = cell(size(S_vals));
+    for i = 1:numel(S_vals)
+        S = S_vals(i);
+        Es   = linspace(1e-12, Emax, Ngrid);
+        vals = fE(Es) - S;
+        iz      = find(abs(vals) < 1e-14);
+        signchg = find(vals(1:end-1) .* vals(2:end) < 0);
+        rootsList = [];
+        if ~isempty(iz)
+            rootsList = [rootsList, Es(iz)]; %#ok<AGROW>
+        end
+        for k = 1:numel(signchg)
+            iL = signchg(k);
+            a_br = Es(iL);
+            b_br = Es(iL+1);
+            try
+                rt = fzero(@(x) fE(x) - S, [a_br b_br]);
+                if rt > 0
+                    rootsList(end+1) = rt;
+                end
+            catch
+            end
+        end
+        if isempty(rootsList)
+            allRoots{i} = [];
+        else
+            rootsList = sort(rootsList(:).');
+            tol = 1e-8;
+            keep = true(size(rootsList));
+            for m = 2:numel(rootsList)
+                if abs(rootsList(m) - rootsList(m-1)) < tol
+                    keep(m) = false;
+                end
+            end
+            allRoots{i} = rootsList(keep);
+        end
+    end
+    inc = nan(size(S_vals));  prev = NaN;
+    for i = 1:numel(S_vals)
+        rts = allRoots{i};
+        if isempty(rts)
+            inc(i) = NaN; prev = NaN;
+        else
+            if isnan(prev)
+                choice = rts(end);
+            else
+                [~,ix] = min(abs(rts - prev));
+                choice = rts(ix);
+            end
+            inc(i) = choice; prev = choice;
+        end
+    end
+    dec = nan(size(S_vals));  prev = NaN;
+    for i = numel(S_vals):-1:1
+        rts = allRoots{i};
+        if isempty(rts)
+            dec(i) = NaN; prev = NaN;
+        else
+            if isnan(prev)
+                choice = rts(1);
+            else
+                [~,ix] = min(abs(rts - prev));
+                choice = rts(ix);
+            end
+            dec(i) = choice; prev = choice;
+        end
+    end
+    figure('Color','w'); hold on; box on; grid on;
+    plot(ra_vals, inc, '-',  'LineWidth', 2.0);
+    plot(ra_vals, dec, '--', 'LineWidth', 2.0);
+    xlabel('r / a');
+    ylabel('E(r) (V/m)');
+    title(sprintf('Μέρος (\\Delta): E(r) vs r/a (E_0 = %.1f V/m)', E0), 'Interpreter','tex');
+    xlim([rmin rmax]);
+    ymax = max([3, nanmax([inc(:); dec(:)])*1.1]);
+    if ~isfinite(ymax), ymax = 3; end
+    ylim([0 ymax]);
+    legend({'increasing','decreasing'}, 'Location','northwest');
+end
