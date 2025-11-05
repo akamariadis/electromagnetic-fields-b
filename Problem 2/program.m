@@ -1,5 +1,5 @@
-clear;
 close all;
+clear;
 clf;
 clc;
 
